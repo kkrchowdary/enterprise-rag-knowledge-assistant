@@ -27,7 +27,7 @@ load_dotenv()
 
 OLLAMA_MODEL = os.getenv(
     "OLLAMA_MODEL",
-    "nemotron-3.5-super:latest"
+    "llama3.2:latest"
 )
 
 OLLAMA_BASE_URL = os.getenv(
@@ -123,46 +123,46 @@ def health():
 # 7. GENERAL LLM CHAT ENDPOINT
 # =====================================================
 
-@app.post("/chat")
-def chat(request: ChatRequest):
+# @app.post("/chat")
+# def chat(request: ChatRequest):
 
-    try:
+#     try:
 
-        logger.info("Processing general chat request")
+#         logger.info("Processing general chat request")
 
-        response = ollama_client.chat(
-            model=OLLAMA_MODEL,
-            messages=[
-                {
-                    "role": "user",
-                    "content": request.question
-                }
-            ]
-        )
+#         response = ollama_client.chat(
+#             model=OLLAMA_MODEL,
+#             messages=[
+#                 {
+#                     "role": "user",
+#                     "content": request.question
+#                 }
+#             ]
+#         )
 
-        return {
-            "question": request.question,
-            "answer": response.message.content,
-            "model": OLLAMA_MODEL
-        }
+#         return {
+#             "question": request.question,
+#             "answer": response.message.content,
+#             "model": OLLAMA_MODEL
+#         }
 
-    except ResponseError as error:
+#     except ResponseError as error:
 
-        logger.exception("Ollama model error")
+#         logger.exception("Ollama model error")
 
-        raise HTTPException(
-            status_code=502,
-            detail=f"Ollama error: {error.error}"
-        )
+#         raise HTTPException(
+#             status_code=502,
+#             detail=f"Ollama error: {error.error}"
+#         )
 
-    except Exception:
+#     except Exception:
 
-        logger.exception("LLM service unavailable")
+#         logger.exception("LLM service unavailable")
 
-        raise HTTPException(
-            status_code=503,
-            detail="LLM service unavailable"
-        )
+#         raise HTTPException(
+#             status_code=503,
+#             detail="LLM service unavailable"
+#         )
 
 
 # =====================================================
@@ -171,32 +171,30 @@ def chat(request: ChatRequest):
 
 @app.post("/rag/ask")
 def ask_rag(request: RAGRequest):
-
+    logger.info("=" * 60)
+    logger.info("POST /rag/ask")
+    logger.info("Question: %s", request.question)
+    logger.info("Top K: %d", request.top_k)
     try:
-
         rag_service = RAGService()
-
         response = rag_service.ask(
             question=request.question,
             top_k=request.top_k
         )
-
+        logger.info(
+            "RAG response summary: answer_length=%d, sources=%d",
+            len(response.get("answer") or ""),
+            response.get("total_sources", 0)
+        )
         return response
-
     except ValueError as error:
-
+        logger.warning(
+            "RAG validation failed: %s",
+            error
+        )
         raise HTTPException(
             status_code=400,
             detail=str(error)
-        )
-
-    except Exception:
-
-        logger.exception("RAG processing failed")
-
-        raise HTTPException(
-            status_code=500,
-            detail="RAG processing failed"
         )
 
 # =====================================================
