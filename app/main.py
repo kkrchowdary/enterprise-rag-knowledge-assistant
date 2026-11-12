@@ -175,6 +175,7 @@ def ask_rag(request: RAGRequest):
     logger.info("POST /rag/ask")
     logger.info("Question: %s", request.question)
     logger.info("Top K: %d", request.top_k)
+    logger.debug("API RAG full request: %r", request.model_dump())
     try:
         rag_service = RAGService()
         response = rag_service.ask(
@@ -186,6 +187,7 @@ def ask_rag(request: RAGRequest):
             len(response.get("answer") or ""),
             response.get("total_sources", 0)
         )
+        logger.debug("API RAG full response: %r", response)
         return response
     except ValueError as error:
         logger.warning(
@@ -196,6 +198,9 @@ def ask_rag(request: RAGRequest):
             status_code=400,
             detail=str(error)
         )
+    except Exception:
+        logger.exception("POST /rag/ask failed")
+        raise
 
 # =====================================================
 # 9. DOCUMENT UPLOAD ENDPOINT

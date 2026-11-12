@@ -112,6 +112,12 @@ Retrieved document passages are supplied to an Ollama language model as context.
 
 The model generates an answer based on the retrieved information.
 
+A single prompt handles casual conversation, document questions, and unsupported factual questions.
+There is no greeting classifier or keyword list. Every valid query uses one generation call,
+including when no documents are indexed or no passages pass the relevance threshold.
+The prompt directs conversational replies to omit citations and unsupported factual answers to refuse.
+Only cited sources are returned. Prompt instructions and valid citations do not guarantee factual support.
+
 ### Source Citations
 
 The application is designed to provide source references alongside generated answers.
@@ -122,17 +128,58 @@ Source metadata includes:
 - Page number
 - Retrieved passage
 - Retrieval distance
+- Raw cosine similarity and its display percentage
+- Score type and retrieval rank
 - Citation identifier
 
 Citation accuracy requires evaluation because generated citation markers do not independently prove factual support.
 
 ### Relevance Filtering
 
-The RAG service supports configurable distance-based filtering.
+The service uses cosine distance exclusively and verifies the persisted Chroma collection configuration.
+A collection using L2, inner product, or an unknown metric is rejected rather than scored incorrectly.
+Existing collections are never deleted or converted automatically; incompatible collections require
+a separately created cosine collection and document re-ingestion.
 
-A relevance threshold can be configured to exclude retrieved passages that exceed the selected distance.
+Cosine similarity is `1 - cosine_distance`, with range `[-1, 1]`. Higher similarity ranks first.
+`RELEVANCE_THRESHOLD` is a minimum cosine similarity in `[0, 1]`, not a maximum distance:
+`0.5` accepts distances at most `0.5`; `0.7` accepts distances at most `0.3`.
+Filtering and ranking use unrounded scores. API sources retain raw distance and similarity;
+`similarity_percent` is rounded for display only. A displayed `90%` means cosine similarity `0.9`,
+not a 90% probability of relevance or a correct answer.
 
-Threshold values must be calibrated to the ChromaDB distance metric and embedding model.
+The default `RELEVANCE_THRESHOLD=0.5` is a starting point, not a universal recommendation.
+Raise it to require stronger similarity or lower it to admit more passages.
+Check representative document questions and out-of-context questions when changing it.
+No automatic per-query rescaling or fallback lowers the threshold.
+Retrieval defaults to the nearest three chunks; filtering, deduplication, and citation selection
+can leave fewer than three returned sources. Chroma uses approximate nearest-neighbor search;
+this application does not add a cross-encoder reranker or hybrid keyword search.
+
+References:
+
+- [Chroma distance metrics and HNSW configuration](https://docs.trychroma.com/docs/collections/configure)
+- [LangChain Chroma distance and relevance-score APIs](https://reference.langchain.com/python/langchain_chroma/vectorstores/Chroma/)
+- [LangChain cosine conversion and threshold filtering](https://github.com/langchain-ai/langchain/blob/master/libs/core/langchain_core/vectorstores/base.py)
+- [Ollama chat API and generation options](https://docs.ollama.com/api/chat)
+
+The implementation keeps the existing native Chroma and Ollama clients; LangChain is not required.
+Ollama honors `OLLAMA_BASE_URL` and `OLLAMA_MODEL`, defaults to `llama3.2`, and uses non-streaming
+chat at temperature `0.1`. Generation temperature affects randomness, not retrieval similarity.
+The application's retrieval `top_k=3` is unrelated to Ollama's token-sampling `options.top_k`.
+
+### Terminal Debug Logs
+
+Set `LOG_LEVEL=DEBUG` in `.env`, or set `$env:LOG_LEVEL="DEBUG"` in PowerShell before starting the backend.
+Restart the backend after changing the log level.
+
+Debug logs include the full user query, query embedding, Chroma response,
+chunk IDs and metadata, ranking and filtering decisions, context, Ollama requests and
+responses (including token counts and timing fields), citation checks, and final API response.
+Failures include tracebacks. Logs go to the backend terminal, not the Streamlit terminal.
+
+These logs contain private document text and user data. Use them only for local debugging;
+set `LOG_LEVEL=INFO` to disable full payload logging. Treat saved terminal output as sensitive.
 
 ### Interactive Chat
 

@@ -6,7 +6,7 @@ def search_documents(question: str):
 
     results = vector_store.search(
         query = question,
-        top_k= 10
+        top_k= 3
     )
 
     documents = results["documents"][0]
