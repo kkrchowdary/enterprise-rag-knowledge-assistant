@@ -1,6 +1,8 @@
 from pathlib import Path
 import hashlib
 
+from chromadb.api.types import Metadata
+
 from app.ingestion.pdf_loader import extract_pdf_pages
 from app.ingestion.chunker import chunk_text
 from app.retrieval.vector_store import VectorStore
@@ -17,7 +19,7 @@ def ingest_pdf(
     pages = extract_pdf_pages(file_path)
 
     texts = []
-    metadatas = []
+    metadatas: list[Metadata] = []
     ids = []
 
     # Preserve original document filename
